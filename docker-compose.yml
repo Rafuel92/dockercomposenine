@@ -1,0 +1,61 @@
+version: "3"
+
+services:
+  app:
+    image: previousnext/php-apache:7.3-3.x-dev
+    ports:
+      - "80:80"
+      - "8910:8910"
+    volumes:
+      - .:/data:cached
+      # This allows for developers to access the remote environment.
+      - $HOME/.ssh:/root/.ssh
+      # Mount composer cache.
+      - $HOME/.composer:/root/.composer
+    environment:
+      - XDEBUG_CONFIG=remote_host=docker.for.mac.host.internal remote_connect_back=0
+      - PHP_IDE_CONFIG=serverName=localhost
+      - XDEBUG_ENABLED=0
+      - COMPOSER_MEMORY_LIMIT=-1
+    labels:
+      - 'traefik.backend=app'
+      - 'traefik.port=80'
+      - 'traefik.frontend.rule=Host:drupalnineenv.hinto.it'
+
+  db:
+    image: mariadb
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=local
+      - MYSQL_USER=drupal
+      - MYSQL_PASSWORD=drupal
+    ports:
+      - "3306:3306"
+      
+  chrome:
+    image: drupalci/webdriver-chromedriver:production
+    network_mode: service:app
+    ulimits:
+      core:
+        soft: -1
+        hard: -1
+    cap_add:
+      - SYS_ADMIN
+    volumes:
+      - /dev/shm:/dev/shm
+    entrypoint:
+      - chromedriver
+      - "--no-sandbox"
+      - "--log-path=/tmp/chromedriver.log"
+      - "--verbose"
+      - "--whitelisted-ips="
+
+  traefik:
+    image: traefik:v1.6.2
+    command: -c /dev/null --web --docker --logLevel=INFO
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - '8000:80'
+      - '8080:8080'
+      #- '443:443'
